@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto max-w-7xl">
+    {% if not connected %}
+    <!-- Connection Form -->
+    <div class="max-w-md mx-auto card mt-10">
+        <h2 class="text-xl font-bold mb-4">Connect to Device</h2>
+        <form hx-post="/connect" hx-target="body" class="space-y-4">
+            <div>
+                <label class="block text-sm text-gray-400">COM Port</label>
+                <select name="port" class="input-dark w-full mt-1">
+                    {% for p in ports %}
+                    <option value="{{ p.device }}">{{ p.device }} - {{ p.description }}</option>
+                    {% endfor %}
+                    <!-- If no ports (e.g. docker mock), allow manual entry or show mock option -->
+                    <option value="MOCK">MOCK (Virtual)</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400">Slave Address</label>
+                <input type="number" name="slave_id" value="1" class="input-dark w-full mt-1">
+            </div>
+            <button type="submit" class="btn-primary w-full">Connect</button>
+        </form>
+    </div>
+    {% else %}
+
+    <!-- Top Stats Row -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="card">
+            <div class="text-gray-400 text-xs uppercase">Serial Number</div>
+            <div class="text-2xl font-mono text-blue-300">{{ data.serial_number }}</div>
+        </div>
+        <div class="card">
+            <div class="text-gray-400 text-xs uppercase">Revision</div>
+            <div class="text-2xl font-mono text-purple-300">{{ data.revision }}</div>
+        </div>
+        <div class="card">
+            <div class="text-gray-400 text-xs uppercase">Uptime</div>
+            <div class="text-xl font-mono text-green-300">{{ data.uptime }}</div>
+        </div>
+        <div class="card">
+            <div class="text-gray-400 text-xs uppercase">Temperature</div>
+            <div class="text-2xl font-mono text-orange-300">{{ data.temperature }} °C</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Charts Area (2/3 width) -->
+        <div class="lg:col-span-2 space-y-6">
+            <div class="card h-[350px]">
+                <h3 class="text-sm font-bold text-gray-300 mb-2">TriAxial Acceleration (g RMS)</h3>
+                <div id="chart-accel" class="w-full h-[300px]"></div>
+            </div>
+            <div class="card h-[350px]">
+                <h3 class="text-sm font-bold text-gray-300 mb-2">TriAxial Velocity (ips RMS)</h3>
+                <div id="chart-vel" class="w-full h-[300px]"></div>
+            </div>
+        </div>
+
+        <!-- Settings Area (1/3 width) -->
+        <div class="space-y-4">
+            <div class="card">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-white">Device Settings</h3>
+                    <form hx-post="/disconnect" hx-target="body">
+                        <button
+                            class="text-xs text-red-400 hover:text-red-300 border border-red-900 px-2 py-1 rounded">Disconnect</button>
+                    </form>
+                </div>
+
+                <table class="w-full text-sm text-left">
+                    <thead>
+                        <tr class="text-gray-500 border-b border-gray-700">
+                            <th class="py-2">Setting</th>
+                            <th class="py-2 text-right">Value</th>
+                            <th class="py-2"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Macro for Setting Row -->
+                        {% macro setting_row(label, reg, val) %}
+                        <tr class="border-b border-gray-700/50">
+                            <td class="py-2 text-gray-300">{{ label }}</td>
+                            <td class="py-2 text-right font-mono text-blue-200">
+                                <span id="val-{{reg}}">{{ val }}</span>
+                            </td>
+                            <td class="py-2 text-right pl-2">
+                                <form hx-post="/api/settings/update" hx-target="#val-{{reg}}"
+                                    class="flex justify-end gap-1">
+                                    <input type="hidden" name="register" value="{{ reg }}">
+                                    <input type="number" name="value" value="{{ val }}"
+                                        class="w-16 bg-gray-700 text-xs p-1 rounded border-none text-right">
+                                    <button class="text-xs bg-blue-600 px-2 py-1 rounded">Set</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endmacro %}
+
+                        {{ setting_row("g Range (366)", 366, data.settings.g_range) }}
+
+                        <!-- Filters Accel 1 -->
+                        {{ setting_row("Filt Acc 1 Low", 382, data.settings.filters_accel_1[0]) }}
+                        {{ setting_row("Filt Acc 1 High", 383, data.settings.filters_accel_1[1]) }}
+
+                        <!-- Filters Vel 1 -->
+                        {{ setting_row("Filt Vel 1 Low", 384, data.settings.filters_vel_1[0]) }}
+                        {{ setting_row("Filt Vel 1 High", 385, data.settings.filters_vel_1[1]) }}
+
+                        <!-- Filters Accel 2 -->
+                        {{ setting_row("Filt Acc 2 Low", 386, data.settings.filters_accel_2[0]) }}
+                        {{ setting_row("Filt Acc 2 High", 387, data.settings.filters_accel_2[1]) }}
+
+                        <!-- Filters Vel 2 -->
+                        {{ setting_row("Filt Vel 2 Low", 388, data.settings.filters_vel_2[0]) }}
+                        {{ setting_row("Filt Vel 2 High", 389, data.settings.filters_vel_2[1]) }}
+
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Logic -->
+    <script>
+        // Init Charts
+        const accChart = echarts.init(document.getElementById('chart-accel'));
+        const velChart = echarts.init(document.getElementById('chart-vel'));
+
+        const dataLimit = 100;
+        let xData = [];
+        let accSeries = [[], [], []];
+        let velSeries = [[], [], []];
+
+        const optionBase = (title, legends) => ({
+            tooltip: { trigger: 'axis' },
+            legend: { data: legends, textStyle: { color: '#94a3b8' } },
+            grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+            xAxis: { type: 'category', boundaryGap: false, data: xData, axisLabel: { show: false } },
+            yAxis: { type: 'value', splitLine: { lineStyle: { color: '#334155' } } },
+            series: legends.map((l, i) => ({
+                name: l,
+                type: 'line',
+                sampling: 'lttb',
+                symbol: 'none',
+                data: []
+            }))
+        });
+
+        accChart.setOption(optionBase('Accel', ['X', 'Y', 'Z']));
+        velChart.setOption(optionBase('Vel', ['X', 'Y', 'Z']));
+
+        window.addEventListener('resize', () => {
+            accChart.resize();
+            velChart.resize();
+        });
+
+        // Polling loop
+        setInterval(async () => {
+            try {
+                const res = await fetch('/api/data/stream');
+                const json = await res.json();
+
+                if (!json.timestamp) return;
+
+                const timeStr = new Date(json.timestamp * 1000).toLocaleTimeString();
+
+                if (xData.length > dataLimit) {
+                    xData.shift();
+                    accSeries.forEach(s => s.shift());
+                    velSeries.forEach(s => s.shift());
+                }
+
+                xData.push(timeStr);
+
+                // Update Arrays
+                [0, 1, 2].forEach(i => accSeries[i].push(json.accel[i]));
+                [0, 1, 2].forEach(i => velSeries[i].push(json.vel[i]));
+
+                // Update Charts
+                accChart.setOption({
+                    xAxis: { data: xData },
+                    series: [
+                        { data: accSeries[0] }, { data: accSeries[1] }, { data: accSeries[2] }
+                    ]
+                });
+
+                velChart.setOption({
+                    xAxis: { data: xData },
+                    series: [
+                        { data: velSeries[0] }, { data: velSeries[1] }, { data: velSeries[2] }
+                    ]
+                });
+
+            } catch (e) {
+                console.error("Poll error", e);
+            }
+        }, 1000); // 1s Interval
+    </script>
+    {% endif %}
+</div>
+{% endblock %}

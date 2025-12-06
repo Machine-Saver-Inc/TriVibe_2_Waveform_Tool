@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modbus RTU Dashboard</title>
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <!-- ECharts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <style>
+        body { background-color: #0f172a; color: #e2e8f0; }
+        .card { background-color: #1e293b; border-radius: 0.5rem; padding: 1rem; }
+        .input-dark { background-color: #334155; border: 1px solid #475569; color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; }
+        .btn-primary { background-color: #3b82f6; color: white; padding: 0.5rem 1rem; border-radius: 0.25rem; cursor: pointer; }
+        .btn-primary:hover { background-color: #2563eb; }
+        .btn-danger { background-color: #ef4444; color: white; padding: 0.5rem 1rem; border-radius: 0.25rem; cursor: pointer; }
+    </style>
+</head>
+<body class="h-screen flex flex-col font-sans">
+    <nav class="bg-gray-800 p-4 border-b border-gray-700 flex justify-between items-center">
+        <h1 class="text-xl font-bold text-blue-400">⚡ Modbus RTU Dashboard</h1>
+        <div id="connection-status" class="text-sm">
+            Status: <span class="font-mono text-yellow-400">{{ status }}</span>
+        </div>
+    </nav>
+    <main class="flex-grow p-4 overflow-auto" id="main-content">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

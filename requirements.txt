@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+pyserial
+minimalmodbus
+jinja2
+python-multipart
