@@ -1,5 +1,23 @@
 # Modbus RTU Dashboard
 
+<!-- machine-saver-scope:start -->
+## Scope
+
+TriVibe-2 Modbus RTU dashboard for sensor interaction, waveform visualization and settings workflows.
+
+**Owner:** Machine-Saver-Inc. **Development area:** Applications and documentation.
+
+## Ownership boundaries
+
+The tool consumes the device protocol; it does not define embedded firmware or own the platform's ingestion contract.
+
+## Development tracking
+
+Track work in this repository's issues and pull requests. Cross-repository work is coordinated through the [Machine Saver development Projects](https://github.com/orgs/Machine-Saver-Inc/projects).
+
+Follow this repository's contribution instructions and preserve links to related product issues. Scope describes responsibility; release and deployment readiness require the repository's own evidence.
+<!-- machine-saver-scope:end -->
+
 A Python-native dashboard to control RS485 sensors, visualize vibration data, and manage settings.
 
 ## Features
